@@ -1,95 +1,93 @@
-from flask import Flask, jsonify, request, session, redirect, url_for, escape, request
-from flask import Flask, render_template
-app = Flask(__name__)
-from flask import request
-
-
-
-# creating a Flask app
+from flask import Flask, render_template, redirect, url_for, request, flash
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql import func
+import os
 
 app = Flask(__name__)
 
-@app.route('/', methods = ['GET', 'POST'])
-def home():
-	if(request.method == 'GET'):
 
-		data = "hello world"
-		return jsonify({'data': data})
+# userpass = "mysql+pymysql://root:@"
+# basedir = "127.0.0.1"
+# dbname = "/company"
 
-@app.route('/home/<int:num>', methods = ['GET'])
-def disp(num):
-
-	return jsonify({'data': num**2})
+# app.config["SQLALCHEMY_DATABASE_URI"] = userpass + basedir + dbname
+# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
-# driver function
-if __name__ == '__main__':
+basedir = os.path.abspath(os.path.dirname(__file__))
+    
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] =\
+        'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'c6d19142e2891d8d9434463ed9b54fe8'
 
-	app.run(debug = True)
-	
+db = SQLAlchemy(app)
 
+class Employes(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    telp = db.Column(db.String(50), nullable=False)
+    address = db.Column(db.String(255), nullable=False)
 
-# ########## Text file ######
+    def __init__(self, name, email, telp, address):
+        self.name = name
+        self.email = email
+        self.telp = telp
+        self.address = address
 
-@app.route("/app/")
+@app.route('/')
 def index():
-    return render_template('index.html')
+    data_employe = db.session.query(Employes)
+    return render_template('index.html', data=data_employe)
 
-@app.route('/getfile', methods=['GET','POST'])
-def getfile():
+@app.route('/input', methods=['GET', 'POST'])
+def input_data():
     if request.method == 'POST':
-        result = request.form['myfile']
-    else:
-        result = request.args.get['myfile']
-    return result
+        name = request.form['name']
+        email = request.form['email']
+        telp = request.form['telp']
+        address = request.form['address']
 
+        add_data = Employes(name, email, telp, address)
+        
+        db.session.add(add_data)
+        db.session.commit()
 
-############ Render the Html Page #####
+        flash("Input Data Success")
 
-
-@app.route('/welcome/')
-def welcome():
-   return render_template('home.html')
-
-
-
-######################### Sessions ########
-
-
-# Set the secret key to some random bytes. Keep this really secret!
-app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
-
-@app.route('/login/')
-def login():
-    if 'username' in session:
-        return 'Logged in as %s' % escape(session['username'])
-    return 'You are not logged in'
-
-@app.route('/login/', methods=['GET', 'POST'])
-def res():
-    if request.method == 'POST':
-        session['username'] = request.form['username']
         return redirect(url_for('index'))
-    return '''
-        <form method="post">
-            <p><input type=text name=username>
-            <p><input type=submit value=Login>
-        </form>
-    '''
 
-@app.route('/logout/')
-def cms():
-    # remove the username from the session if it's there
-    session.pop('username', None)
+    return render_template('input.html')
+
+@app.route('/edit/<int:id>')
+def edit_data(id):
+    data_employes = Employes.query.get(id)
+    return render_template('edit.html', data=data_employes)
+
+@app.route('/proses_edit', methods=['POST', 'GET'])
+def proses_edit():
+    data_employes = Employes.query.get(request.form.get('id'))
+
+    data_employes.name = request.form['name']
+    data_employes.email = request.form['email']
+    data_employes.telp = request.form['telp']
+    data_employes.address = request.form['address']
+
+    db.session.commit()
+
+    flash('Edit Data Success')
+
     return redirect(url_for('index'))
 
+@app.route('/delete/<int:id>')
+def delete(id):
+    data_employe = Employes.query.get(id)
+    db.session.delete(data_employe)
+    db.session.commit()
 
-#########################
+    flash('Delete Data Success')
 
- 
-
-@app.route('/sta/')
-def sta():
-    return render_template('sta.html')
- 
+    return redirect(url_for('index'))
 
